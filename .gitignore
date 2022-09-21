@@ -3,3 +3,5 @@
 /result*
 *.pyc
 __pycache__
+/.direnv
+/.envrc
