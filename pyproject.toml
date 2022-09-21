@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "clockodo"
+version = "0.1.0"
+description = "CLI and Python API for clocko:do"
+authors = ["nyantec GmbH <oss@nyantec.com>"]
+license = "MirOS"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = "^2.28.1"
+
+[tool.poetry.dev-dependencies]
+
+[tool.poetry.scripts]
+clockodo = "clockodo.__main__:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

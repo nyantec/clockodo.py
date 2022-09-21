@@ -20,7 +20,8 @@ import os
 import sys
 import clockodo
 
-def main(args):
+def main():
+    args = sys.argv[1:]
     api = clockodo.Clockodo(
         api_user=os.getenv("CLOCKODO_API_USER"),
         api_token=os.getenv("CLOCKODO_API_TOKEN")
@@ -47,4 +48,5 @@ def main(args):
         api.stop_clock(api.current_clock())
         print("Clock stopped.")
 
-main(sys.argv[1:])
+if __name__ == "__main__":
+    main()

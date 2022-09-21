@@ -2,3 +2,4 @@
 \#*#
 /result*
 *.pyc
+__pycache__
