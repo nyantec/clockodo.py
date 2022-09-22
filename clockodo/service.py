@@ -27,7 +27,10 @@ class Service(FromJsonBlob):
         self.note = note
 
     def __str__(self):
-        return f"{self.name} (service ID {self.id})"
+        active = ""
+        if not self.active:
+            active = ", inactive"
+        return f"{self.name} (service ID {self.id}{active})"
 
 
 class ServiceApi(ClockodoApi):

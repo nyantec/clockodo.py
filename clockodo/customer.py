@@ -43,7 +43,10 @@ class Customer(FromJsonBlob):
             raise ClockodoError("You seem to lack privileges to view notes on customers.")
 
     def __str__(self):
-        return f"{self.name} (customer ID {self.id})"
+        active = ""
+        if not self.active:
+            active = ", inactive"
+        return f"{self.name} (customer ID {self.id}{active})"
 
 
 class CustomerApi(ClockodoApi):

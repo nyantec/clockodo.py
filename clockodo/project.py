@@ -46,7 +46,10 @@ class Project(FromJsonBlob):
             raise ClockodoError("You seem to lack privileges to view notes on projects.")
 
     def __str__(self):
-        return f"{self.name} (project ID {self.id})"
+        active = ""
+        if not self.active:
+            active = ", inactive"
+        return f"{self.name} (project ID {self.id}{active}, for customer ID {self.customers_id})"
 
 
 class ProjectApi(ClockodoApi):
