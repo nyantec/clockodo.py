@@ -35,7 +35,8 @@ class ClockodoApi:
         response = requests.request(
             method=method,
             url=CLOCKODO_BASE_URL + endpoint,
-            data=params,
+            data=None if method == "GET" else params,
+            params=None if method != "GET" else params,
             headers={
                 'X-ClockodoApiUser': self.user,
                 'X-ClockodoApiKey': self.token,

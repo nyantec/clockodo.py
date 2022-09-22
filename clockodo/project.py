@@ -55,3 +55,13 @@ class Project(FromJsonBlob):
 class ProjectApi(ClockodoApi):
     def get_project(self, id):
         entry = self._api_call(f"v2/projects/{id}")["project"]
+
+    def list_projects(self, customer=None, active=None, page=None):
+        response = self._api_call(f"v2/projects", params={
+            "filter[active]": active,
+            "filter[customers_id]": customer.id if customer is not None else None,
+            "page": page
+        })
+        response["projects"] = list(map(lambda c: Project.from_json_blob(self, c), response["projects"]))
+
+        return response

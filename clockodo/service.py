@@ -37,3 +37,9 @@ class ServiceApi(ClockodoApi):
     def get_service(self, id):
         entry = self._api_call(f"services/{id}")["service"]
         return Service.from_json_blob(self, entry)
+
+    def list_services(self):
+        response = self._api_call(f"services")
+        response["services"] = list(map(lambda s: Service.from_json_blob(self, s), response["services"]))
+
+        return response
