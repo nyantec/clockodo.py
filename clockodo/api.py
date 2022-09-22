@@ -12,7 +12,7 @@ class ClockodoError(Exception):
 
 class ClockodoApiError(ClockodoError, Exception):
     def __init__(self, response):
-        self.status = response.status
+        self.status = response.status_code
         try:
             self.data = response.json()
         except requests.exceptions.JSONDecodeError:
