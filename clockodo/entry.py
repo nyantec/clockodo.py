@@ -98,7 +98,7 @@ class EntryWithLumpSumService(FromJsonBlob, BaseEntry):
 class EntryApi(ClockodoApi):
     def get_entry(self, id):
         response = self._api_call(f"v2/entries/{id}")
-        BaseEntry.from_json_blob(self, response["entry"])
+        return BaseEntry.from_json_blob(self, response["entry"])
 
     def list_entries(self, time_since, time_until,
                      page=None,
