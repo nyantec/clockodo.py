@@ -58,7 +58,7 @@ class ProjectApi(ClockodoApi):
 
     def list_projects(self, customer=None, active=None, page=None):
         response = self._api_call(f"v2/projects", params={
-            "filter[active]": active,
+            "filter[active]": str(int(active)),
             "filter[customers_id]": customer.id if customer is not None else None,
             "page": page
         })

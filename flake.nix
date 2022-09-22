@@ -36,6 +36,10 @@
           clockodo = ./.;
         };
       };
-    in poetry-env.env;
+    in poetry-env.env.overrideAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ (with pkgs; [
+        poetry
+      ]);
+    });
   }));
 }

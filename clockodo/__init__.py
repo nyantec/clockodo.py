@@ -21,6 +21,7 @@ from clockodo.clock import ClockApi
 from clockodo.service import ServiceApi
 from clockodo.project import ProjectApi
 from clockodo.customer import CustomerApi
+from clockodo.entry import EntryApi
 
-class Clockodo(ClockApi, CustomerApi, ProjectApi, ServiceApi, ClockodoApi):
+class Clockodo(ClockApi, EntryApi, CustomerApi, ProjectApi, ServiceApi, ClockodoApi):
     pass

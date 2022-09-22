@@ -18,12 +18,62 @@
 
 import os
 import sys
+import click
 import clockodo
+
+# https://stackoverflow.com/questions/52053491/a-command-without-name-in-click/52069546#52069546
+class DefaultCommandGroup(click.Group):
+    """Create a group which can run a default command if no other commands match."""
+
+    def command(self, *args, **kwargs):
+        default_command = kwargs.pop('default_command', False)
+        if default_command and not args:
+            kwargs['name'] = kwargs.get('name', '<>')
+        decorator = super(DefaultCommandGroup, self).command(*args, **kwargs)
+
+        if default_command:
+            def new_decorator(f):
+                cmd = decorator(f)
+                self.default_command = cmd.name
+                return cmd
+
+            return new_decorator
+
+        return decorator
+
+    def resolve_command(self, ctx, args):
+        try:
+            # test if the command parses
+            return super(
+                DefaultCommandGroup, self).resolve_command(ctx, args)
+        except click.UsageError:
+            # command did not parse, assume it is the default command
+            args.insert(0, self.default_command)
+            return super(
+                DefaultCommandGroup, self).resolve_command(ctx, args)
+
 
 def eprint(*args, **kwargs):
     return print(*args, file=sys.stderr, **kwargs)
 
-def list_pages(api_call, key):
+def clock_entry_cb(clock):
+    customer = str(clock.customer())
+    project = ""
+    _project = clock.project()
+    if _project is not None:
+        _project = str(_project)
+        project = f"\nProject: {project}"
+    service = str(clock.service())
+    text = clock.text()
+    return f"""---
+{clock}
+Customer: {customer}{project}
+Service: {service}
+Description: {text}
+---"""
+
+
+def list_pages(api_call, key, cb=str):
     count_pages = None
     current_page = None
 
@@ -31,64 +81,92 @@ def list_pages(api_call, key):
         response = api_call(None if current_page == None else current_page + 1)
 
         for c in response[key]:
-            print(str(c))
+            print(cb(c))
 
         if count_pages is None:
             count_pages = response["paging"]["count_pages"]
         current_page = response["paging"]["current_page"]
 
-def main():
-    try:
-        api_user = os.getenv("CLOCKODO_API_USER")
-        api_token = os.getenv("CLOCKODO_API_TOKEN")
-        if api_user is None or api_token is None:
-            eprint("CLOCKODO_API_USER should contain your user email, CLOCKODO_API_TOKEN should contain your access token.")
-            sys.exit(1)
+@click.group()
+@click.option('--user', envvar='CLOCKODO_API_USER', show_envvar=True)
+@click.option('--token', envvar='CLOCKODO_API_TOKEN', show_envvar=True)
+@click.pass_context
+def cli(ctx, user, token):
+    ctx.obj = clockodo.Clockodo(user, token)
 
-        args = sys.argv[1:]
-        api = clockodo.Clockodo(api_user=api_user, api_token=api_token)
+@cli.group(cls=DefaultCommandGroup, invoke_without_command=True)
+@click.pass_context
+def clock(ctx):
+    if not ctx.invoked_subcommand:
+        ctx.invoke(current_clock)
 
-        if len(args) == 0 or (len(args) == 1 and args[0] == "clock"):
-            print("Current clock:")
-            clock = api.current_clock()
-            customer = clock.customer()
-            project = clock.project()
-            service = clock.service()
-            print("ID {clock.id}, since {clock.time_since}, {until}".format(
-                clock=clock,
-                until="still running" if clock.time_until is None else f"until {clock.time_until}"
-            ))
-            print("Customer:", str(customer))
-
-            if project is not None:
-                print("Project:", str(project))
-
-            print("Service", str(service))
-            print("Description:", clock.text())
-        elif len(args) > 1 and args[0] == "clock":
-            if args[1] == "stop":
-                api.stop_clock(api.current_clock())
-                print("Clock stopped.")
-        elif args[0] == "customer":
-            if len(args) == 1:
-                list_pages(lambda p: api.list_customers(page=p), "customers")
-        elif args[0] == "project":
-            if len(args) == 1 or (len(args) > 1 and args[1] == "list"):
-                customer = None
-                if len(args) == 4 and args[2] == "--customer":
-                    customer = api.get_customer(int(args[3]))
-                list_pages(lambda p: api.list_projects(page=p, customer=customer), "projects")
-        elif args[0] == "service":
-            for s in api.list_services()["services"]:
-                print(str(s))
-
-
-    except clockodo.api.ClockodoApiError as e:
-        if e.status == 401:
-            eprint("clocko:do API returned HTTP 401.")
-            eprint("Ensure you have CLOCKODO_API_USER and CLOCKODO_API_TOKEN environment variables set properly.")
-        else:
-            eprint("clocko:do API returned HTTP {}: {}".format(e.status, e.data["error"]["message"]))
+@clock.command(default_command=True, name="current")
+@click.pass_obj
+def current_clock(api):
+    clock = api.current_clock()
+    if clock is None:
+        print("No running clock")
         sys.exit(1)
+    print(clock_entry_cb(clock))
+
+@clock.command(name="stop")
+@click.pass_obj
+def stop_clock(api):
+    clock = api.current_clock().stop()
+    print("Finished:", str(clock))
+
+
+@clock.command(name="new")
+@click.option("--customer", type=int)
+@click.option("--project", type=int, required=False)
+@click.option("--service", type=int)
+@click.argument("text", type=str)
+@click.pass_obj
+def new_clock(api, customer, project, service, text):
+    customer = api.get_customer(customer)
+    project = api.get_project(project) if project is not None else None
+    service = api.get_service(service)
+    clock = clockodo.clock.ClockEntry(
+        api=api,
+        customer=customer,
+        project=project,
+        service=service,
+        text=text
+    ).start()
+    print(clock_entry_cb(clock))
+
+
+@cli.command()
+@click.option('--active', required=False, default=None, type=bool)
+@click.pass_obj
+def customers(api, active=None):
+    list_pages(lambda p: api.list_customers(page=p, active=active), "customers")
+
+@cli.command()
+@click.option('--active', required=False, default=None, type=bool)
+@click.option('--customer', required=False, default=None, type=int)
+@click.pass_obj
+def projects(api, active, customer):
+    if customer is not None:
+        customer = api.get_customer(customer)
+    list_pages(lambda p: api.list_projects(page=p, customer=customer, active=active), "projects")
+
+@cli.command()
+@click.pass_obj
+def services(api):
+    list_pages(lambda p: api.list_services(page=p), "services")
+
+
+@cli.command()
+@click.argument('time_since', type=str)
+@click.argument('time_until', type=str)
+@click.pass_obj
+def entries(api, time_since, time_until):
+    list_pages(
+        lambda p: api.list_entries(time_since, time_until, page=p),
+        "entries",
+        cb=clock_entry_cb
+    )
+
 if __name__ == "__main__":
-    main()
+    cli()
