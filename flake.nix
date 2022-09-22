@@ -36,8 +36,6 @@
           clockodo = ./.;
         };
       };
-    in pkgs.mkShell {
-      buildInputs = [ poetry-env ];
-    };
+    in poetry-env.env;
   }));
 }
