@@ -139,7 +139,7 @@ class EntryApi(ClockodoApi):
                 edit[term + "s_id"] = edit[term].id if edit[term] is not None else None
                 del edit[term]
         for term in ["time_since", "time_until"]:
-            if term in edit and edit[term] is not None:
+            if term in edit and isinstance(edit[term], datetime.datetime):
                 edit[term] = iso8601(edit[term])
 
         response = self._api_call(f"v2/entries/{entry.id}", method="PUT", params=edit)
