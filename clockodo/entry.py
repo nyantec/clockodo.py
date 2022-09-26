@@ -1,6 +1,7 @@
 import datetime
 from abc import ABCMeta, abstractmethod
 from clockodo.api import FromJsonBlob, ClockodoApi
+from clockodo.i18n import _
 
 ISO8601_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
 
@@ -25,7 +26,7 @@ class BaseEntry(metaclass=ABCMeta):
         elif blob["type"] == 3:
             return EntryWithLumpSumService.from_json_blob(api, blob)
         else:
-            raise ClockodoError("clocko:do returned entry with unknown type " + str(blob["type"]))
+            raise ClockodoError(_("clocko:do returned entry with unknown type %s") % str(blob["type"]))
 
 
 class ClockEntry(FromJsonBlob, BaseEntry):
@@ -49,7 +50,7 @@ class ClockEntry(FromJsonBlob, BaseEntry):
                  hourly_rate=None):
         self.type = 1
         if texts_id is None and text is None:
-            raise ClockodoError("One of texts_id or text should be specified!")
+            raise ClockodoError(_("One of `texts_id` or `text` should be specified!"))
         self._api = api
         self.customers_id = customer.id
         self.services_id = service.id
@@ -87,10 +88,10 @@ class ClockEntry(FromJsonBlob, BaseEntry):
             return datetime.datetime.now(tz=datetime.timezone.utc) - self.time_since
 
     def __str__(self):
-        running=", still running" if self.time_until is None else ""
+        running=", {}".format(_("still running")) if self.time_until is None else ""
         duration = format_timedelta(self.clock_duration())
-
-        return f"Clock entry (ID {self.id}) // {duration}{running}"
+        entrytext = _("Clock entry")
+        return f"{entrytext} (ID {self.id}) // {duration}{running}"
 
     def stop(self):
         self._api.stop_clock(self)

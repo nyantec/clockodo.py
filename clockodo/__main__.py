@@ -21,6 +21,10 @@ import sys
 import datetime
 import click
 import clockodo
+import gettext
+gettext.bindtextdomain("clockodo-py")
+gettext.textdomain("clockodo-py")
+_ = gettext.gettext
 
 # https://stackoverflow.com/questions/52053491/a-command-without-name-in-click/52069546#52069546
 class DefaultCommandGroup(click.Group):
@@ -63,7 +67,7 @@ def clock_entry_cb(clock):
     _project = clock.project()
     if _project is not None:
         _project = str(_project)
-        project = f"\nProject: {project}"
+        project = "\n" + _("Project: ") + _project
     service = str(clock.service())
     time_since = datetime.datetime.strftime(
         clock.time_since,
@@ -72,17 +76,25 @@ def clock_entry_cb(clock):
     if clock.time_until is None:
         time_until = ""
     else:
-        time_until = "\nEnded at: " + datetime.datetime.strftime(
+        time_until = "\n" + _("Ended at: ") + datetime.datetime.strftime(
             clock.time_until,
             clockodo.entry.ISO8601_TIME_FORMAT
         )
-    return f"""---
-{clock}
-Started at: {time_since}{time_until}
-Customer: {customer}{project}
-Service: {service}
-Description: {clock.text}
----"""
+    return ("---\n{clock}\n"
+            + _("Started at: ")
+            + "{time_since}{time_until}\n"
+            + _("Customer: ")
+            + "{customer}{project}"
+            + _("Service: ") + service
+            + _("Description: ") + clock.text
+            + "---").format(
+                clock=clock,
+                time_since=time_since,
+                time_until=time_until,
+                customer=customer,
+                project=project,
+                service=service
+            )
 
 
 def list_pages(api_call, key, cb=str):

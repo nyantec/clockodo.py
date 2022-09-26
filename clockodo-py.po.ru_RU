@@ -1,0 +1,60 @@
+# Translations template for clockodo.py.
+# Copyright (C) 2022 nyantec GmbH
+# This file is distributed under the same license as the clockodo.py project.
+# Vika Shleina <vsh@nyantec.com>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: 0.1.0\n"
+"Report-Msgid-Bugs-To: oss@nyantec.com\n"
+"POT-Creation-Date: 2022-09-26 15:20+0300\n"
+"PO-Revision-Date: 2022-09-26 15:23+0300\n"
+"Last-Translator: Vika Shleina <vsh@nyantec.com>\n"
+"Language-Team: Russian <RU@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.3\n"
+
+#: clockodo/__main__.py:70
+msgid "Project: "
+msgstr "Проект: "
+
+#: clockodo/__main__.py:79
+msgid "Ended at: "
+msgstr "Закончена в: "
+
+#: clockodo/__main__.py:84
+msgid "Started at: "
+msgstr "Начата в: "
+
+#: clockodo/__main__.py:86
+msgid "Customer: "
+msgstr "Клиент: "
+
+#: clockodo/__main__.py:88
+msgid "Service: "
+msgstr "Услуга: "
+
+#: clockodo/__main__.py:89
+msgid "Description: "
+msgstr "Описание: "
+
+#: clockodo/entry.py:29
+#, python-format
+msgid "clocko:do returned entry with unknown type %s"
+msgstr "clocko:do вернул запись с неизвестным типом %s"
+
+#: clockodo/entry.py:53
+msgid "One of `texts_id` or `text` should be specified!"
+msgstr "Один из параметров `texts_id` или `text` должен быть указан!"
+
+#: clockodo/entry.py:91
+msgid "still running"
+msgstr "все еще активна"
+
+#: clockodo/entry.py:93
+msgid "Clock entry"
+msgstr "Запись со временем"
+
