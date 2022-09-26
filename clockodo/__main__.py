@@ -202,11 +202,34 @@ def entries(api, time_since, time_until):
             datetime.date.today() + datetime.timedelta(days=1),
             datetime.time(0, tzinfo=datetime.timezone.utc)
         )
-    list_pages(
-        lambda p: api.list_entries(time_since, time_until, page=p),
-        "entries",
-        cb=clock_entry_cb
-    )
+
+    count_pages = None
+    current_page = None
+    entries = []
+    while count_pages is None or current_page != count_pages:
+        response = api.list_entries(
+            page=None if current_page is None else current_page + 1,
+            time_since=time_since, time_until=time_until
+        )
+
+        entries.extend(response["entries"])
+        if "paging" not in response:
+            break
+        if count_pages is None:
+            count_pages = response["paging"]["count_pages"]
+        current_page = response["paging"]["current_page"]
+
+    for i, entry in enumerate(entries):
+        print(clock_entry_cb(entry))
+        if entry.time_until is not None:
+            try:
+                next_since = entries[i+1].time_since
+            except IndexError:
+                next_since = datetime.datetime.now(tz=datetime.timezone.utc)
+            break_duration = next_since - entry.time_until
+            if break_duration > datetime.timedelta(0):
+                print("Break:", clockodo.entry.format_timedelta(break_duration))
+
 
 if __name__ == "__main__":
     cli()
