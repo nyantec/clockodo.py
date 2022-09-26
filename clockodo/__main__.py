@@ -22,6 +22,8 @@ import datetime
 import click
 import clockodo
 
+Iso8601 = click.DateTime([clockodo.entry.ISO8601_TIME_FORMAT])
+
 # https://stackoverflow.com/questions/52053491/a-command-without-name-in-click/52069546#52069546
 class DefaultCommandGroup(click.Group):
     """Create a group which can run a default command if no other commands match."""
@@ -133,9 +135,10 @@ def stop_clock(api):
 @click.option("--customer", type=int)
 @click.option("--project", type=int, required=False)
 @click.option("--service", type=int)
+@click.option("--billable", type=bool, required=False)
 @click.argument("text", type=str)
 @click.pass_obj
-def new_clock(api, customer, project, service, text):
+def new_clock(api, customer, project, service, text, billable):
     customer = api.get_customer(customer)
     project = api.get_project(project) if project is not None else None
     service = api.get_service(service)
@@ -144,9 +147,23 @@ def new_clock(api, customer, project, service, text):
         customer=customer,
         project=project,
         service=service,
-        text=text
+        text=text,
+        billable=billable
     ).start()
     print(clock_entry_cb(clock))
+
+
+@clock.command(name="edit")
+@click.option("--customer", type=int, required=False)
+@click.option("--project", type=int, required=False)
+@click.option("--service", type=int, required=False)
+@click.option("--text", type=str, required=False)
+@click.option("--time-since", type=Iso8601, required=False)
+@click.option("--billable", type=bool, required=False)
+@click.pass_obj
+def edit_clock(api, **kwargs):
+    clock = api.current_clock()
+    print(clock_entry_cb(clock.edit(kwargs)))
 
 
 @cli.command()
@@ -171,8 +188,8 @@ def services(api):
 
 
 @cli.command()
-@click.argument('time_since', type=click.DateTime([clockodo.entry.ISO8601_TIME_FORMAT]), required=False)
-@click.argument('time_until', type=click.DateTime([clockodo.entry.ISO8601_TIME_FORMAT]), required=False)
+@click.argument('time_since', type=Iso8601, required=False)
+@click.argument('time_until', type=Iso8601, required=False)
 @click.pass_obj
 def entries(api, time_since, time_until):
     if time_since is None:

@@ -15,6 +15,13 @@ def format_timedelta(timedelta):
         d=d, hours=hours, minutes=minutes
     )
 
+def iso8601(dt: datetime.datetime) -> str:
+    dt = dt.strftime(ISO8601_TIME_FORMAT)
+    if dt.endswith("+0000"):
+        dt = dt.removesuffix("+0000") + "Z"
+    return dt
+
+
 class BaseEntry(metaclass=ABCMeta):
     @classmethod
     def from_json_blob(cls, api, blob: dict):
@@ -26,6 +33,9 @@ class BaseEntry(metaclass=ABCMeta):
             return EntryWithLumpSumService.from_json_blob(api, blob)
         else:
             raise ClockodoError("clocko:do returned entry with unknown type " + str(blob["type"]))
+
+    def edit(self, edit: dict):
+        return self._api.edit_entry(self, edit)
 
 
 class ClockEntry(FromJsonBlob, BaseEntry):
@@ -123,17 +133,26 @@ class EntryApi(ClockodoApi):
         response = self._api_call(f"v2/entries/{id}")
         return BaseEntry.from_json_blob(self, response["entry"])
 
+    def edit_entry(self, entry: BaseEntry, edit: dict):
+        for term in ["customer", "service", "project", "user"]:
+            if term in edit:
+                edit[term + "s_id"] = edit[term].id if edit[term] is not None else None
+                del edit[term]
+        for term in ["time_since", "time_until"]:
+            if term in edit and edit[term] is not None:
+                edit[term] = iso8601(edit[term])
+
+        response = self._api_call(f"v2/entries/{entry.id}", method="PUT", params=edit)
+
+        return BaseEntry.from_json_blob(self, response["entry"])
+
     def list_entries(self, time_since: datetime.datetime,
                      time_until: datetime.datetime,
                      page=None,
                      filters={},
                      revenues_for_hard_budget=False):
-        time_since = time_since.strftime(ISO8601_TIME_FORMAT)
-        if time_since.endswith("+0000"):
-            time_since = time_since.removesuffix("+0000") + "Z"
-        time_until = time_until.strftime(ISO8601_TIME_FORMAT)
-        if time_until.endswith("+0000"):
-            time_until = time_until.removesuffix("+0000") + "Z"
+        time_since = iso8601(time_since)
+        time_until = iso8601(time_until)
 
         data = {
             "time_since": time_since,
