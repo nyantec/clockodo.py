@@ -57,11 +57,15 @@ class ProjectApi(ClockodoApi):
         entry = self._api_call(f"v2/projects/{id}")["project"]
 
     def list_projects(self, customer=None, active=None, page=None):
-        response = self._api_call(f"v2/projects", params={
-            "filter[active]": str(int(active)),
-            "filter[customers_id]": customer.id if customer is not None else None,
+        params = {
             "page": page
-        })
+        }
+        if active is not None:
+            params["filter[active]"] = str(int(active))
+        if customer is not None:
+            params["filter[customers_id]"] = customer.id
+
+        response = self._api_call(f"v2/projects", params=params)
         response["projects"] = list(map(lambda c: Project.from_json_blob(self, c), response["projects"]))
 
         return response

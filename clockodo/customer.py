@@ -55,10 +55,12 @@ class CustomerApi(ClockodoApi):
         return Customer.from_json_blob(self, entry)
 
     def list_customers(self, active=None, page=None):
-        response = self._api_call(f"v2/customers", params={
-            "filter[active]": str(int(active)),
+        params = {
             "page": page
-        })
+        }
+        if active is not None:
+            params["filter[active]"] = str(int(active))
+        response = self._api_call(f"v2/customers", params=params)
         response["customers"] = list(map(lambda c: Customer.from_json_blob(self, c), response["customers"]))
 
         return response

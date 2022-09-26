@@ -82,7 +82,8 @@ def list_pages(api_call, key, cb=str):
 
         for c in response[key]:
             print(cb(c))
-
+        if "paging" not in response:
+            break
         if count_pages is None:
             count_pages = response["paging"]["count_pages"]
         current_page = response["paging"]["current_page"]
