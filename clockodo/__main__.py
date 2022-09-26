@@ -59,6 +59,11 @@ class DefaultCommandGroup(click.Group):
 def eprint(*args, **kwargs):
     return print(*args, file=sys.stderr, **kwargs)
 
+
+def our_tz():
+    return datetime.datetime.now(tz=datetime.timezone.utc).astimezone().tzinfo
+
+
 def clock_entry_cb(clock):
     customer = str(clock.customer())
     project = ""
@@ -68,14 +73,14 @@ def clock_entry_cb(clock):
         project = f"\nProject: {project}"
     service = str(clock.service())
     time_since = datetime.datetime.strftime(
-        clock.time_since,
+        clock.time_since.astimezone(our_tz()),
         clockodo.entry.ISO8601_TIME_FORMAT
     )
     if clock.time_until is None:
         time_until = ""
     else:
         time_until = "\nEnded at: " + datetime.datetime.strftime(
-            clock.time_until,
+            clock.time_until.astimezone(our_tz()),
             clockodo.entry.ISO8601_TIME_FORMAT
         )
     return f"""---
@@ -195,12 +200,12 @@ def entries(api, time_since, time_until):
     if time_since is None:
         time_since = datetime.datetime.combine(
             datetime.date.today(),
-            datetime.time(0, tzinfo=datetime.timezone.utc)
+            datetime.time(0, tzinfo=our_tz())
         )
     if time_until is None:
         time_until = datetime.datetime.combine(
             datetime.date.today() + datetime.timedelta(days=1),
-            datetime.time(0, tzinfo=datetime.timezone.utc)
+            datetime.time(0, tzinfo=our_tz())
         )
 
     count_pages = None
@@ -225,7 +230,7 @@ def entries(api, time_since, time_until):
             try:
                 next_since = entries[i+1].time_since
             except IndexError:
-                next_since = datetime.datetime.now(tz=datetime.timezone.utc)
+                next_since = datetime.datetime.now(tz=our_tz())
             break_duration = next_since - entry.time_until
             if break_duration > datetime.timedelta(0):
                 print("Break:", clockodo.entry.format_timedelta(break_duration))

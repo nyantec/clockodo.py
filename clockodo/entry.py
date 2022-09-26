@@ -15,7 +15,12 @@ def format_timedelta(timedelta):
         d=d, hours=hours, minutes=minutes
     )
 
+
 def iso8601(dt: datetime.datetime) -> str:
+    # Normalize datetime to UTC
+    # It's the only timezone clocko:do understands apparently
+    if dt.tzinfo != datetime.timezone.utc:
+        dt = dt.replace(tzinfo=datetime.timezone.utc) - dt.utcoffset()
     dt = dt.strftime(ISO8601_TIME_FORMAT)
     if dt.endswith("+0000"):
         dt = dt.removesuffix("+0000") + "Z"
