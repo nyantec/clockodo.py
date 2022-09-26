@@ -224,17 +224,29 @@ def entries(api, time_since, time_until):
             count_pages = response["paging"]["count_pages"]
         current_page = response["paging"]["current_page"]
 
+    break_count = 0
+    total_break_duration = datetime.timedelta(0)
+    total_work_time = datetime.timedelta(0)
+
     for i, entry in enumerate(entries):
         print(clock_entry_cb(entry))
+        if entry.duration is not None:
+            total_work_time += datetime.timedelta(seconds=entry.duration)
+        else:
+            total_work_time += datetime.datetime.now(tz=datetime.timezone.utc) - entry.time_since
+
         if entry.time_until is not None:
             try:
                 next_since = entries[i+1].time_since
             except IndexError:
                 next_since = datetime.datetime.now(tz=our_tz())
             break_duration = next_since - entry.time_until
+            total_break_duration += break_duration
             if break_duration > datetime.timedelta(0):
                 print("Break:", clockodo.entry.format_timedelta(break_duration))
+                break_count += 1
 
-
+    print("Total work time:", clockodo.entry.format_timedelta(total_work_time))
+    print(f"Breaks: {break_count}, total duration:", clockodo.entry.format_timedelta(total_break_duration))
 if __name__ == "__main__":
     cli()
