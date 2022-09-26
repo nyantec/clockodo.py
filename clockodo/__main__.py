@@ -171,10 +171,20 @@ def services(api):
 
 
 @cli.command()
-@click.argument('time_since', type=str)
-@click.argument('time_until', type=str)
+@click.argument('time_since', type=click.DateTime([clockodo.entry.ISO8601_TIME_FORMAT]), required=False)
+@click.argument('time_until', type=click.DateTime([clockodo.entry.ISO8601_TIME_FORMAT]), required=False)
 @click.pass_obj
 def entries(api, time_since, time_until):
+    if time_since is None:
+        time_since = datetime.datetime.combine(
+            datetime.date.today(),
+            datetime.time(0, tzinfo=datetime.timezone.utc)
+        )
+    if time_until is None:
+        time_until = datetime.datetime.combine(
+            datetime.date.today() + datetime.timedelta(days=1),
+            datetime.time(0, tzinfo=datetime.timezone.utc)
+        )
     list_pages(
         lambda p: api.list_entries(time_since, time_until, page=p),
         "entries",
