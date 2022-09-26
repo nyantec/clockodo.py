@@ -18,6 +18,7 @@
 
 import os
 import sys
+import datetime
 import click
 import clockodo
 
@@ -64,12 +65,23 @@ def clock_entry_cb(clock):
         _project = str(_project)
         project = f"\nProject: {project}"
     service = str(clock.service())
-    text = clock.text()
+    time_since = datetime.datetime.strftime(
+        clock.time_since,
+        clockodo.entry.ISO8601_TIME_FORMAT
+    )
+    if clock.time_until is None:
+        time_until = ""
+    else:
+        time_until = "\nEnded at: " + datetime.datetime.strftime(
+            clock.time_until,
+            clockodo.entry.ISO8601_TIME_FORMAT
+        )
     return f"""---
 {clock}
+Started at: {time_since}{time_until}
 Customer: {customer}{project}
 Service: {service}
-Description: {text}
+Description: {clock.text}
 ---"""
 
 

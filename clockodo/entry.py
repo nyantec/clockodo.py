@@ -1,5 +1,19 @@
+import datetime
 from abc import ABCMeta, abstractmethod
 from clockodo.api import FromJsonBlob, ClockodoApi
+
+ISO8601_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S%z"
+
+def format_timedelta(timedelta):
+    hours, rem = divmod(timedelta.seconds, 3600)
+    minutes, seconds = divmod(rem, 60)
+    if timedelta.days > 0:
+        d = "{}d, ".format(timedelta.days)
+    else:
+        d = ""
+    return "{d}{hours}h{minutes}m".format(
+        d=d, hours=hours, minutes=minutes
+    )
 
 class BaseEntry(metaclass=ABCMeta):
     @classmethod
@@ -15,12 +29,15 @@ class BaseEntry(metaclass=ABCMeta):
 
 
 class ClockEntry(FromJsonBlob, BaseEntry):
-    _rename_fields = {"text": "_text"}
+    _rename_fields = {}
 
     @classmethod
     def from_json_blob(cls, api, blob: dict):
         entry = super(ClockEntry, cls).from_json_blob(api, blob)
         entry.billable = bool(entry.billable)
+        if entry.time_until is not None:
+            entry.time_until = datetime.datetime.strptime(entry.time_until, ISO8601_TIME_FORMAT)
+        entry.time_since = datetime.datetime.strptime(entry.time_since, ISO8601_TIME_FORMAT)
 
         return entry
 
@@ -37,7 +54,7 @@ class ClockEntry(FromJsonBlob, BaseEntry):
         self.customers_id = customer.id
         self.services_id = service.id
         self.texts_id = texts_id
-        self._text = text
+        self.text = text
         self.projects_id = project.id if project is not None else None
         self.billable = billable
         self.time_since = time_since
@@ -49,6 +66,7 @@ class ClockEntry(FromJsonBlob, BaseEntry):
         self.clocked_offline = None
         self.time_clocked_since = None
         self.time_last_change_worktime = None
+        self.duration = None
         self.hourly_rate = hourly_rate
 
     def customer(self):
@@ -62,12 +80,17 @@ class ClockEntry(FromJsonBlob, BaseEntry):
     def service(self):
         return self._api.get_service(self.services_id)
 
-    def text(self):
-        return self._text
+    def clock_duration(self) -> datetime.timedelta:
+        if self.time_until is not None:
+            return self.time_until - self.time_since
+        else:
+            return datetime.datetime.now(tz=datetime.timezone.utc) - self.time_since
 
     def __str__(self):
-        until="still running" if self.time_until is None else self.time_until
-        return f"Clock entry (ID {self.id}) // {self.time_since} -- {until}"
+        running=", still running" if self.time_until is None else ""
+        duration = format_timedelta(self.clock_duration())
+
+        return f"Clock entry (ID {self.id}) // {duration}{running}"
 
     def stop(self):
         self._api.stop_clock(self)
@@ -100,10 +123,18 @@ class EntryApi(ClockodoApi):
         response = self._api_call(f"v2/entries/{id}")
         return BaseEntry.from_json_blob(self, response["entry"])
 
-    def list_entries(self, time_since, time_until,
+    def list_entries(self, time_since: datetime.datetime,
+                     time_until: datetime.datetime,
                      page=None,
                      filters={},
                      revenues_for_hard_budget=False):
+        time_since = time_since.strftime(ISO8601_TIME_FORMAT)
+        if time_since.endswith("+0000"):
+            time_since = time_since.removesuffix("+0000") + "Z"
+        time_until = time_until.strftime(ISO8601_TIME_FORMAT)
+        if time_until.endswith("+0000"):
+            time_until = time_until.removesuffix("+0000") + "Z"
+
         data = {
             "time_since": time_since,
             "time_until": time_until,

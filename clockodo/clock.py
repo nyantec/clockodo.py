@@ -40,7 +40,7 @@ class ClockApi(ClockodoApi):
                 "customers_id": clock.customers_id,
                 "projects_id": clock.projects_id,
                 "services_id": clock.services_id,
-                "text": clock.text(),
+                "text": clock.text,
                 "texts_id": clock.texts_id,
                 "billable": str(int(clock.billable))
             })["running"]
