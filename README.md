@@ -61,7 +61,9 @@ $ clockodo clock new \
     --billable true
 ```
 
-You can use names for customers, projects and services -- an exact match will be used. Alternatively, you can use IDs that are shown when listing customers, projects or services.
+You can use names for customers, projects and services -- an exact match will be used.
+
+Alternatively, use `--XXX-id` forms with IDs that are shown when listing customers, projects or services.
 
 #### Edit currently running clock
 ```console
