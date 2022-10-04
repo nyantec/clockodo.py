@@ -43,3 +43,6 @@ class ServiceApi(ClockodoApi):
         response["services"] = list(map(lambda s: Service.from_json_blob(self, s), response["services"]))
 
         return response
+
+    def iter_services(self):
+        yield from self.list_services()["services"]

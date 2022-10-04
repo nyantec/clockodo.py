@@ -64,3 +64,20 @@ class CustomerApi(ClockodoApi):
         response["customers"] = list(map(lambda c: Customer.from_json_blob(self, c), response["customers"]))
 
         return response
+
+    def iter_customers(self, active=None):
+        count_pages = None
+        params = {
+            "page": None
+        }
+        if active is not None:
+            params["filter[active]"] = str(int(active))
+        while count_pages is None or params["page"] != count_pages:
+            response = self._api_call(f"v2/customers", params=params)
+            yield from map(lambda c: Customer.from_json_blob(self, c), response["customers"])
+
+            if "paging" not in response:
+                break
+            if count_pages is None:
+                count_pages = response["paging"]["count_pages"]
+            params["page"] = response["paging"]["current_page"]

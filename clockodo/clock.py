@@ -42,6 +42,6 @@ class ClockApi(ClockodoApi):
                 "services_id": clock.services_id,
                 "text": clock.text,
                 "texts_id": clock.texts_id,
-                "billable": str(int(clock.billable))
+                "billable": str(int(clock.billable)) if clock.billable is not None else None
             })["running"]
         )

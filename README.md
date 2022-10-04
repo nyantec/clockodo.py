@@ -61,15 +61,17 @@ $ clockodo clock new \
     --billable true
 ```
 
+You can use names for customers, projects and services -- an exact match will be used. Alternatively, you can use IDs that are shown when listing customers, projects or services.
+
 #### Edit currently running clock
 ```console
 $ clockodo clock edit [PARAMETERS]
 ```
 
 You can edit the following things:
- - Customer (`--customer XXXXXX`)
- - Project (`--project XXXXXX`)
- - Service (`--service XXXXXX`)
+ - Customer (`--customer <name>` or `--customer-id XXXXXX`)
+ - Project (`--project <name>` or `--project-id XXXXXX`)
+ - Service (`--service <name>` or `--service-id XXXXXX`)
  - Description (`--text "blablabla"`)
  - Starting time (`--time-since %Y-%m-%dT%H:%M:%S%z`)
  - Billability (`--billable <true|false>`)
@@ -80,7 +82,7 @@ $ clockodo customers [--active <true|false>]
 ```
 
 ```console
-$ clockodo projects [--active <true|false>] [--customer XXXXXX]
+$ clockodo projects [--active <true|false>] [--customer-id XXXXXX|--customer name]
 ```
 
 ```console

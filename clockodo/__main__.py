@@ -56,10 +56,6 @@ class DefaultCommandGroup(click.Group):
                 DefaultCommandGroup, self).resolve_command(ctx, args)
 
 
-def eprint(*args, **kwargs):
-    return print(*args, file=sys.stderr, **kwargs)
-
-
 def our_tz():
     return datetime.datetime.now(tz=datetime.timezone.utc).astimezone().tzinfo
 
@@ -100,7 +96,7 @@ def list_pages(api_call, key, cb=str):
         response = api_call(None if current_page == None else current_page + 1)
 
         for c in response[key]:
-            print(cb(c))
+            click.echo(cb(c))
         if "paging" not in response:
             break
         if count_pages is None:
@@ -125,28 +121,76 @@ def clock(ctx):
 def current_clock(api):
     clock = api.current_clock()
     if clock is None:
-        print("No running clock")
+        click.echo("No running clock")
         sys.exit(1)
-    print(clock_entry_cb(clock))
+    click.echo(clock_entry_cb(clock))
 
 @clock.command(name="stop")
 @click.pass_obj
 def stop_clock(api):
     clock = api.current_clock().stop()
-    print("Finished:", str(clock))
+    click.echo("Finished: {}".format(str(clock)))
 
 
 @clock.command(name="new")
-@click.option("--customer", type=int)
-@click.option("--project", type=int, required=False)
-@click.option("--service", type=int)
-@click.option("--billable", type=bool, required=False)
+@click.option("--customer", type=str, required=False)
+@click.option("--customer-id", type=int, required=False)
+@click.option("--project", type=str, required=False)
+@click.option("--project-id", type=int, required=False)
+@click.option("--service", type=str, required=False)
+@click.option("--service-id", type=int, required=False)
+@click.option("--billable", type=bool, required=False, default=None)
 @click.argument("text", type=str)
 @click.pass_obj
-def new_clock(api, customer, project, service, text, billable):
-    customer = api.get_customer(customer)
-    project = api.get_project(project) if project is not None else None
-    service = api.get_service(service)
+def new_clock(api, customer, customer_id, project, project_id, service, service_id, text, billable):
+    if customer_id is not None:
+        customer = api.get_customer(customer_id)
+    elif customer is not None:
+        with click.progressbar(api.iter_customers(), label="Determining customer") as bar:
+            for c in bar:
+                if c.name == customer:
+                    customer = c
+                    break
+            else:
+                click.echo(f"Can't find a customer named {customer}", err=True)
+                exit(1)
+    else:
+        click.echo("One of --customer or --customer-id must be specified!")
+        exit(1)
+
+    if project_id is not None:
+        project = api.get_project(project)
+    elif project is not None:
+        with click.progressbar(api.iter_projects(), label="Determining project") as bar:
+            for p in bar:
+                if p.name == project:
+                    project = p
+                    break
+            else:
+                click.echo("Can't find a project named", project, err=True)
+                exit(1)
+    else:
+        project = None
+
+    if service_id is not None:
+        service = api.get_service(service_id)
+    elif service is not None:
+        with click.progressbar(api.iter_services(), label="Determining service") as bar:
+            for s in bar:
+                if s.name == service:
+                    service = s
+                    break
+            else:
+                click.echo(f"Can't find a service named {service}", err=True)
+                exit(1)
+    else:
+        click.echo("One of --service or --service-id must be specified!")
+        exit(1)
+
+    assert isinstance(customer, clockodo.customer.Customer)
+    assert isinstance(service, clockodo.service.Service)
+    assert project is None or isinstance(project, clockodo.project.Project)
+
     clock = clockodo.clock.ClockEntry(
         api=api,
         customer=customer,
@@ -155,11 +199,12 @@ def new_clock(api, customer, project, service, text, billable):
         text=text,
         billable=billable
     ).start()
-    print(clock_entry_cb(clock))
+    click.echo(clock_entry_cb(clock))
 
 
 @clock.command(name="edit")
 @click.option("--customer", type=int, required=False)
+@click.option("--customer-id", type=int, required=False)
 @click.option("--project", type=int, required=False)
 @click.option("--service", type=int, required=False)
 @click.option("--text", type=str, required=False)
@@ -168,23 +213,78 @@ def new_clock(api, customer, project, service, text, billable):
 @click.pass_obj
 def edit_clock(api, **kwargs):
     clock = api.current_clock()
-    print(clock_entry_cb(clock.edit(kwargs)))
+    if kwargs.get("customer_id") is not None:
+        kwargs["customers_id"] = kwargs["customer_id"]
+        del kwargs["customer_id"]
+    elif kwargs.get("customer") is not None:
+        with click.progressbar(api.iter_customers(), label="Determining customer") as bar:
+            for c in bar:
+                if c.name == kwargs["customer"]:
+                    kwargs["customers_id"] = c.id
+                    del kwargs["customer"]
+                    break
+            else:
+                click.echo(f"Can't find a customer named {customer}", err=True)
+                exit(1)
+
+    if kwargs.get("project_id") is not None:
+        kwargs["projects_id"] = kwargs["project_id"]
+        del kwargs["project_id"]
+    elif kwargs.get("project") is not None:
+        with click.progressbar(api.iter_projects(), label="Determining project") as bar:
+            for c in bar:
+                if c.name == kwargs["project"]:
+                    kwargs["projects_id"] = c.id
+                    del kwargs["project"]
+                    break
+            else:
+                click.echo(f"Can't find a project named {project}", err=True)
+                exit(1)
+
+    if kwargs.get("service_id") is not None:
+        kwargs["services_id"] = kwargs["service_id"]
+        del kwargs["service_id"]
+    elif kwargs.get("service") is not None:
+        with click.progressbar(api.iter_services(), label="Determining service") as bar:
+            for c in bar:
+                if c.name == kwargs["service"]:
+                    kwargs["services_id"] = c.id
+                    del kwargs["service"]
+                    break
+            else:
+                click.echo(f"Can't find a service named {service}", err=True)
+                exit(1)
+
+    click.echo(clock_entry_cb(clock.edit(kwargs)))
 
 
 @cli.command()
 @click.option('--active', required=False, default=None, type=bool)
 @click.pass_obj
 def customers(api, active=None):
-    list_pages(lambda p: api.list_customers(page=p, active=active), "customers")
+    for i in api.iter_customers(active=active):
+        print(str(i))
 
 @cli.command()
 @click.option('--active', required=False, default=None, type=bool)
-@click.option('--customer', required=False, default=None, type=int)
+@click.option('--customer-id', required=False, default=None, type=int)
+@click.option('--customer', required=False, default=None, type=str)
 @click.pass_obj
-def projects(api, active, customer):
-    if customer is not None:
-        customer = api.get_customer(customer)
-    list_pages(lambda p: api.list_projects(page=p, customer=customer, active=active), "projects")
+def projects(api, active, customer, customer_id):
+    if customer_id is not None:
+        customer = api.get_customer(customer_id)
+    elif customer is not None:
+        with click.progressbar(api.iter_customers(), label="Determining customer") as bar:
+            for c in bar:
+                if c.name == customer:
+                    customer = c
+                    break
+            else:
+                click.echo(f"Can't find a customer named {customer}", err=True)
+                exit(1)
+
+    for i in api.iter_projects(customer=customer, active=active):
+        print(str(i))
 
 @cli.command()
 @click.pass_obj
@@ -229,7 +329,7 @@ def entries(api, time_since, time_until):
     total_work_time = datetime.timedelta(0)
 
     for i, entry in enumerate(entries):
-        print(clock_entry_cb(entry))
+        click.echo(clock_entry_cb(entry))
         if entry.duration is not None:
             total_work_time += datetime.timedelta(seconds=entry.duration)
         else:
@@ -243,10 +343,13 @@ def entries(api, time_since, time_until):
             break_duration = next_since - entry.time_until
             total_break_duration += break_duration
             if break_duration > datetime.timedelta(0):
-                print("Break:", clockodo.entry.format_timedelta(break_duration))
+                click.echo("Break: {}".format(clockodo.entry.format_timedelta(break_duration)))
                 break_count += 1
 
-    print("Total work time:", clockodo.entry.format_timedelta(total_work_time))
-    print(f"Breaks: {break_count}, total duration:", clockodo.entry.format_timedelta(total_break_duration))
+    click.echo("Total work time: {}".format(clockodo.entry.format_timedelta(total_work_time)))
+    click.echo("Breaks: {}, total duration: {}".format(
+        break_count,
+        clockodo.entry.format_timedelta(total_break_duration)
+    ))
 if __name__ == "__main__":
     cli()
