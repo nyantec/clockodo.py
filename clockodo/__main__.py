@@ -26,6 +26,7 @@ import itertools
 Iso8601 = click.DateTime([clockodo.entry.ISO8601_TIME_FORMAT])
 
 # https://stackoverflow.com/questions/52053491/a-command-without-name-in-click/52069546#52069546
+# TODO replace with https://github.com/click-contrib/click-default-group
 class DefaultCommandGroup(click.Group):
     """Create a group which can run a default command if no other commands match."""
 
@@ -96,11 +97,13 @@ Description: {clock.text}
 def cli(ctx, user, token):
     ctx.obj = clockodo.Clockodo(user, token)
 
+
 @cli.group(cls=DefaultCommandGroup, invoke_without_command=True)
 @click.pass_context
 def clock(ctx):
     if not ctx.invoked_subcommand:
         ctx.invoke(current_clock)
+
 
 @clock.command(default_command=True, name="current")
 @click.pass_obj
@@ -111,12 +114,40 @@ def current_clock(api):
         sys.exit(1)
     click.echo(clock_entry_cb(clock))
 
+
 @clock.command(name="stop")
 @click.pass_obj
 def stop_clock(api):
     clock = api.current_clock().stop()
     click.echo("Finished: {}".format(str(clock)))
 
+
+@clock.command(name="continue")
+@click.pass_obj
+def continue_last_clock(api):
+    current_clock = api.current_clock()
+    if current_clock is not None:
+        click.echo("You're already clocked in!", err=True)
+        exit(1)
+
+    # Figure out today's timespan
+    time_since = datetime.datetime.combine(
+        datetime.date.today(),
+        datetime.time(0, tzinfo=our_tz())
+    )
+    time_until = datetime.datetime.combine(
+        datetime.date.today() + datetime.timedelta(days=1),
+        datetime.time(0, tzinfo=our_tz())
+    )
+
+    # Get the last clock entry for this period
+    *_, last = api.iter_entries(time_since, time_until)
+
+    if not isinstance(last, clockodo.entry.ClockEntry):
+        click.echo("Last entry is not a clock entry!", err=True)
+        exit(1)
+
+    click.echo(clock_entry_cb(last.start()))
 
 @clock.command(name="new")
 @click.option("--customer", type=str, required=False)
@@ -250,6 +281,7 @@ def edit_clock(api, **kwargs):
 def customers(api, active=None):
     for i in api.iter_customers(active=active):
         print(str(i))
+
 
 @cli.command()
 @click.option('--active', required=False, default=None, type=bool)
