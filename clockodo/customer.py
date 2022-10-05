@@ -68,11 +68,11 @@ class CustomerApi(ClockodoApi):
     def iter_customers(self, active=None):
         count_pages = None
         params = {
-            "page": None
+            "page": 1
         }
         if active is not None:
             params["filter[active]"] = str(int(active))
-        while count_pages is None or params["page"] != count_pages:
+        while count_pages is None or params["page"] <= count_pages:
             response = self._api_call(f"v2/customers", params=params)
             yield from map(lambda c: Customer.from_json_blob(self, c), response["customers"])
 
@@ -80,4 +80,4 @@ class CustomerApi(ClockodoApi):
                 break
             if count_pages is None:
                 count_pages = response["paging"]["count_pages"]
-            params["page"] = response["paging"]["current_page"]
+            params["page"] = response["paging"]["current_page"] + 1

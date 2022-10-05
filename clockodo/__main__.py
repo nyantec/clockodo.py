@@ -21,6 +21,7 @@ import sys
 import datetime
 import click
 import clockodo
+import itertools
 
 Iso8601 = click.DateTime([clockodo.entry.ISO8601_TIME_FORMAT])
 
@@ -87,21 +88,6 @@ Service: {service}
 Description: {clock.text}
 ---"""
 
-
-def list_pages(api_call, key, cb=str):
-    count_pages = None
-    current_page = None
-
-    while count_pages is None or current_page != count_pages:
-        response = api_call(None if current_page == None else current_page + 1)
-
-        for c in response[key]:
-            click.echo(cb(c))
-        if "paging" not in response:
-            break
-        if count_pages is None:
-            count_pages = response["paging"]["count_pages"]
-        current_page = response["paging"]["current_page"]
 
 @click.group()
 @click.option('--user', envvar='CLOCKODO_API_USER', show_envvar=True)
@@ -289,7 +275,8 @@ def projects(api, active, customer, customer_id):
 @cli.command()
 @click.pass_obj
 def services(api):
-    list_pages(lambda p: api.list_services(page=p), "services")
+    for i in api.list_services()["services"]:
+        print(str(i))
 
 
 @cli.command()
@@ -308,38 +295,28 @@ def entries(api, time_since, time_until):
             datetime.time(0, tzinfo=our_tz())
         )
 
-    count_pages = None
-    current_page = None
-    entries = []
-    while count_pages is None or current_page != count_pages:
-        response = api.list_entries(
-            page=None if current_page is None else current_page + 1,
-            time_since=time_since, time_until=time_until
-        )
-
-        entries.extend(response["entries"])
-        if "paging" not in response:
-            break
-        if count_pages is None:
-            count_pages = response["paging"]["count_pages"]
-        current_page = response["paging"]["current_page"]
+    def pairwise_with_last_none(iterable):
+        """Like itertools.pairwise(), but returns `(last, None)`
+        instead of `(last-1, last)` as the last entry."""
+        main, peek = itertools.tee(iterable)
+        # Advance the "peek" iterator by one entry
+        next(peek, None)
+        # Zip entries in pairs like this: ABCDEFG -> (AB, BC, CD, DE, EF, FG, G_)
+        yield from itertools.zip_longest(main, peek, fillvalue=None)
 
     break_count = 0
     total_break_duration = datetime.timedelta(0)
     total_work_time = datetime.timedelta(0)
-
-    for i, entry in enumerate(entries):
+    entries = pairwise_with_last_none(api.iter_entries(time_since, time_until))
+    for entry, next_entry in entries:
         click.echo(clock_entry_cb(entry))
         if entry.duration is not None:
             total_work_time += datetime.timedelta(seconds=entry.duration)
         else:
             total_work_time += datetime.datetime.now(tz=datetime.timezone.utc) - entry.time_since
 
-        if entry.time_until is not None:
-            try:
-                next_since = entries[i+1].time_since
-            except IndexError:
-                next_since = datetime.datetime.now(tz=our_tz())
+        if entry.time_until is not None and next_entry is not None:
+            next_since = next_entry.time_since
             break_duration = next_since - entry.time_until
             total_break_duration += break_duration
             if break_duration > datetime.timedelta(0):

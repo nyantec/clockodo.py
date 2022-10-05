@@ -15,7 +15,6 @@
 # of dealing in the work, even if advised of the possibility of such
 # damage or existence of a defect, except proven that it results out
 # of said person's immediate fault when using the work as intended.
-
 from clockodo.api import FromJsonBlob, ClockodoApi
 
 class Project(FromJsonBlob):
@@ -73,14 +72,14 @@ class ProjectApi(ClockodoApi):
     def iter_projects(self, active=None, customer=None):
         count_pages = None
         params = {
-            "page": None
+            "page": 1
         }
         if active is not None:
             params["filter[active]"] = str(int(active))
         if customer is not None:
             params["filter[customers_id]"] = customer.id
 
-        while count_pages is None or params["page"] != count_pages:
+        while count_pages is None or params["page"] <= count_pages:
             response = self._api_call(f"v2/projects", params=params)
             yield from map(lambda c: Project.from_json_blob(self, c), response["projects"])
 
@@ -88,4 +87,4 @@ class ProjectApi(ClockodoApi):
                 break
             if count_pages is None:
                 count_pages = response["paging"]["count_pages"]
-            params["page"] = response["paging"]["current_page"]
+            params["page"] = response["paging"]["current_page"] + 1

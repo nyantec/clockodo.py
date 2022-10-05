@@ -178,3 +178,36 @@ class EntryApi(ClockodoApi):
         result["entries"] = list(map(lambda e: BaseEntry.from_json_blob(self, e), result["entries"]))
 
         return result
+
+    def iter_entries(self, time_since: datetime.datetime,
+                     time_until: datetime.datetime,
+                     filters={},
+                     revenues_for_hard_budget=False):
+        time_since = iso8601(time_since)
+        time_until = iso8601(time_until)
+
+        params = {
+            "time_since": time_since,
+            "time_until": time_until,
+            "page": 1,
+            # it's not me who invented this kinda long field! ~Vika
+            "calc_also_revenues_for_projects_with_hard_budget": str(int(revenues_for_hard_budget))
+        }
+        for k, v in filters.items():
+            if k in ["customer", "project", "service"]:
+                params[f"filters[{k}s_id]"] = v.id
+            else:
+                if isinstance(v, bool):
+                    v = str(int(v))
+                params[f"filters[{k}]"] = v
+
+        count_pages = None
+        while count_pages is None or params["page"] <= count_pages:
+            response = self._api_call(f"v2/entries", params=params)
+            yield from map(lambda e: BaseEntry.from_json_blob(self, e), response["entries"])
+
+            if "paging" not in response:
+                break
+            if count_pages is None:
+                count_pages = response["paging"]["count_pages"]
+            params["page"] = response["paging"]["current_page"] + 1
