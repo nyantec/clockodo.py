@@ -63,13 +63,11 @@ def our_tz():
 
 
 def clock_entry_cb(clock):
-    customer = str(clock.customer())
+    customer = str(clock.customer)
     project = ""
-    _project = clock.project()
-    if _project is not None:
-        _project = str(_project)
-        project = f"\nProject: {project}"
-    service = str(clock.service())
+    if clock.project is not None:
+        project = f"\nProject: {clock.project}"
+    service = str(clock.service)
     time_since = datetime.datetime.strftime(
         clock.time_since.astimezone(our_tz()),
         clockodo.entry.ISO8601_TIME_FORMAT

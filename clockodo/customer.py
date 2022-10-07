@@ -16,6 +16,7 @@
 # damage or existence of a defect, except proven that it results out
 # of said person's immediate fault when using the work as intended.
 
+import functools
 from clockodo.api import FromJsonBlob, ClockodoApi, ClockodoError
 
 class Customer(FromJsonBlob):
@@ -50,6 +51,7 @@ class Customer(FromJsonBlob):
 
 
 class CustomerApi(ClockodoApi):
+    @functools.lru_cache(maxsize=10)
     def get_customer(self, id):
         entry = self._api_call(f"v2/customers/{id}")["customer"]
         return Customer.from_json_blob(self, entry)

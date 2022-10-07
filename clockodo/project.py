@@ -15,6 +15,8 @@
 # of dealing in the work, even if advised of the possibility of such
 # damage or existence of a defect, except proven that it results out
 # of said person's immediate fault when using the work as intended.
+
+import functools
 from clockodo.api import FromJsonBlob, ClockodoApi
 
 class Project(FromJsonBlob):
@@ -52,6 +54,7 @@ class Project(FromJsonBlob):
 
 
 class ProjectApi(ClockodoApi):
+    @functools.lru_cache(maxsize=100)
     def get_project(self, id):
         entry = self._api_call(f"v2/projects/{id}")["project"]
 

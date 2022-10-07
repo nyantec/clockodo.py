@@ -1,4 +1,5 @@
 import datetime
+import functools
 from abc import ABCMeta, abstractmethod
 from clockodo.api import FromJsonBlob, ClockodoApi
 
@@ -42,6 +43,16 @@ class BaseEntry(metaclass=ABCMeta):
     def edit(self, edit: dict):
         return self._api.edit_entry(self, edit)
 
+    @functools.cached_property
+    def customer(self):
+        return self._api.get_customer(self.customers_id)
+
+    @functools.cached_property
+    def project(self):
+        if self.projects_id is None:
+            return None
+        return self._api.get_project(self.projects_id)
+
 
 class ClockEntry(FromJsonBlob, BaseEntry):
     _rename_fields = {}
@@ -84,14 +95,7 @@ class ClockEntry(FromJsonBlob, BaseEntry):
         self.duration = None
         self.hourly_rate = hourly_rate
 
-    def customer(self):
-        return self._api.get_customer(self.customers_id)
-
-    def project(self):
-        if self.projects_id is None:
-            return None
-        return self._api.get_project(self.projects_id)
-
+    @functools.cached_property
     def service(self):
         return self._api.get_service(self.services_id)
 
@@ -132,6 +136,11 @@ class LumpSumValue(FromJsonBlob, BaseEntry):
 
     def __str__(self):
         return f"Lump sum entry (ID {self.id}) // {self.lumpsum:.02f} EUR"
+
+    @functools.cached_property
+    def service(self):
+        return self._api.get_service(self.services_id)
+
 
 class EntryWithLumpSumService(FromJsonBlob, BaseEntry):
     pass
