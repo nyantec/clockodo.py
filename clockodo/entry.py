@@ -130,6 +130,9 @@ class LumpSumValue(FromJsonBlob, BaseEntry):
         self.lumpsum = lumpsum
         self.users_id = user.id
 
+    def __str__(self):
+        return f"Lump sum entry (ID {self.id}) // {self.lumpsum:.02f} EUR"
+
 class EntryWithLumpSumService(FromJsonBlob, BaseEntry):
     pass
 
