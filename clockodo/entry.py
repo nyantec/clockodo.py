@@ -31,14 +31,18 @@ def iso8601(dt: datetime.datetime) -> str:
 class BaseEntry(metaclass=ABCMeta):
     @classmethod
     def from_json_blob(cls, api, blob: dict):
+        entry = None
         if blob["type"] == 1:
-            return ClockEntry.from_json_blob(api, blob)
+            entry = ClockEntry.from_json_blob(api, blob)
         elif blob["type"] == 2:
-            return LumpSumValue.from_json_blob(api, blob)
+            entry = LumpSumValue.from_json_blob(api, blob)
         elif blob["type"] == 3:
-            return EntryWithLumpSumService.from_json_blob(api, blob)
+            entry = EntryWithLumpSumService.from_json_blob(api, blob)
         else:
             raise ClockodoError("clocko:do returned entry with unknown type " + str(blob["type"]))
+        entry.time_since = datetime.datetime.strptime(entry.time_since, ISO8601_TIME_FORMAT)
+
+        return entry
 
     def edit(self, edit: dict):
         return self._api.edit_entry(self, edit)
@@ -60,10 +64,8 @@ class ClockEntry(FromJsonBlob, BaseEntry):
     @classmethod
     def from_json_blob(cls, api, blob: dict):
         entry = super(ClockEntry, cls).from_json_blob(api, blob)
-        entry.billable = bool(entry.billable)
         if entry.time_until is not None:
             entry.time_until = datetime.datetime.strptime(entry.time_until, ISO8601_TIME_FORMAT)
-        entry.time_since = datetime.datetime.strptime(entry.time_since, ISO8601_TIME_FORMAT)
 
         return entry
 
@@ -71,8 +73,9 @@ class ClockEntry(FromJsonBlob, BaseEntry):
                  time_since=None, time_until=None,
                  texts_id=None, text=None,
                  project=None,
-                 billable=False,
+                 billable=0,
                  hourly_rate=None):
+        self.id = None
         self.type = 1
         if texts_id is None and text is None:
             raise ClockodoError("One of texts_id or text should be specified!")
@@ -108,8 +111,15 @@ class ClockEntry(FromJsonBlob, BaseEntry):
     def __str__(self):
         running=", still running" if self.time_until is None else ""
         duration = format_timedelta(self.clock_duration())
+        id=f"(ID {self.id})" if self.id is not None else ""
+        if self.billable == 0:
+            billable = "not billable"
+        elif self.billable == 1:
+            billable = "billable, not yet billed"
+        elif self.billable == 2:
+            billable = "already billed"
 
-        return f"Clock entry (ID {self.id}) // {duration}{running}"
+        return f"Clock entry{id} ({billable}) // {duration}{running}"
 
     def stop(self):
         self._api.stop_clock(self)
@@ -122,7 +132,8 @@ class LumpSumValue(FromJsonBlob, BaseEntry):
     def __init__(self, api, customer, service,
                  time_since, lumpsum,
                  text=None, user=None,
-                 project=None, billable=False):
+                 project=None, billable=1):
+        self.id = None
         self.type = 2
         self.text = text
         self._api = api
@@ -132,10 +143,18 @@ class LumpSumValue(FromJsonBlob, BaseEntry):
         self.billable = billable
         self.time_since = time_since
         self.lumpsum = lumpsum
-        self.users_id = user.id
+        self.users_id = user.id if user is not None else None
 
     def __str__(self):
-        return f"Lump sum entry (ID {self.id}) // {self.lumpsum:.02f} EUR"
+        id=f"(ID {self.id})" if self.id is not None else ""
+        if self.billable == 0:
+            billable = "not billable"
+        elif self.billable == 1:
+            billable = "billable, not yet billed"
+        elif self.billable == 2:
+            billable = "already billed"
+
+        return f"Lump sum entry{id} ({billable}) // {self.lumpsum:.02f} EUR"
 
     @functools.cached_property
     def service(self):
@@ -143,11 +162,45 @@ class LumpSumValue(FromJsonBlob, BaseEntry):
 
 
 class EntryWithLumpSumService(FromJsonBlob, BaseEntry):
-    pass
+    def __init__(self, api, *args, **kwargs):
+        raise NotImplementedError
+
 
 class EntryApi(ClockodoApi):
     def get_entry(self, id):
         response = self._api_call(f"v2/entries/{id}")
+        return BaseEntry.from_json_blob(self, response["entry"])
+
+    def add_entry(self, entry: BaseEntry):
+        params = {}
+        if isinstance(entry, ClockEntry):
+            for term in ["customer", "service", "project", "user"]:
+                if getattr(entry, term, None) is not None:
+                    params[term + "s_id"] = getattr(entry, term).id
+            for term in ["time_since", "time_until"]:
+                if getattr(entry, term, None) is not None:
+                    params[term] = iso8601(getattr(entry, term))
+            for term in ["text", "texts_id"]:
+                if getattr(entry, term, None) is not None:
+                    params[term] = getattr(entry, term)
+            if getattr(entry, "billable", None) is not None:
+                params["billable"] = str(int(entry.billable))
+        elif isinstance(entry, LumpSumValue):
+            for term in ["customer", "service", "project", "user"]:
+                if getattr(entry, term, None) is not None:
+                    params[term + "s_id"] = getattr(entry, term).id
+            for term in ["time_since"]:
+                if getattr(entry, term, None) is not None:
+                    params[term] = iso8601(getattr(entry, term))
+            for term in ["text", "texts_id", "lumpsum"]:
+                if getattr(entry, term, None) is not None:
+                    params[term] = getattr(entry, term)
+            if getattr(entry, "billable", None) is not None:
+                params["billable"] = str(int(entry.billable))
+        else:
+            raise NotImpelementedError
+
+        response = self._api_call(f"v2/entries", method="POST", params=params)
         return BaseEntry.from_json_blob(self, response["entry"])
 
     def edit_entry(self, entry: BaseEntry, edit: dict):

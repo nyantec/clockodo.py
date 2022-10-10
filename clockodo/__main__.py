@@ -19,9 +19,11 @@
 import os
 import sys
 import datetime
-import click
-import clockodo
 import itertools
+import functools
+import click
+import inquirer
+import clockodo
 
 Iso8601 = click.DateTime([clockodo.entry.ISO8601_TIME_FORMAT])
 
@@ -85,6 +87,23 @@ Started at: {time_since}{time_until}
 Customer: {customer}{project}
 Service: {service}
 Description: {clock.text}
+---"""
+
+
+def lump_sum_cb(entry):
+    project = ""
+    if entry.project is not None:
+        project = f"\nProject: {entry.project}"
+    time_since = datetime.datetime.strftime(
+        entry.time_since.astimezone(our_tz()),
+        clockodo.entry.ISO8601_TIME_FORMAT
+    )
+    return f"""---
+{entry}
+Datetime: {time_since}
+Customer: {entry.customer}{project}
+Service: {entry.service}
+Description: {entry.text}
 ---"""
 
 
@@ -309,11 +328,138 @@ def services(api):
         print(str(i))
 
 
-@cli.command()
+@cli.group(cls=DefaultCommandGroup, invoke_without_command=True)
+@click.pass_context
+def entries(ctx):
+    if not ctx.invoked_subcommand:
+        ctx.invoke(list_entries)
+
+
+@entries.command(name="create")
+@click.pass_obj
+def create_entry_interactive(api):
+    def memoize_once(fun):
+        _cached = None
+        @functools.wraps(fun)
+        def _inner(*args, **kwargs):
+            nonlocal _cached
+            if _cached is None:
+                _cached = fun(*args, **kwargs)
+            return _cached
+
+        return _inner
+
+    @memoize_once
+    def project_entries(answers):
+        return [("(none)", None)] \
+            + [(p.name, p) for p in api.iter_projects(
+                active=True,
+                customer=answers["customer"]
+            )]
+
+    @memoize_once
+    def customer_entries(answers):
+        return [(c.name, c) for c in api.iter_customers(active=True)]
+
+    @memoize_once
+    def service_entries(answers):
+        return [(s.name, s) for s in filter(lambda s: s.active, api.iter_services())]
+
+    def validate_timestamp(answers, current):
+        try:
+            current = datetime.datetime.strptime(current, "%H:%M:%S").time()
+        except ValueError:
+            raise inquirer.errors.ValidationError(current, reason="Time doesn't match format")
+        time_since = answers.get("time_since", None)
+        if time_since is not None:
+            time_since = datetime.datetime.strptime(time_since, "%H:%M:%S").time()
+            if current < time_since:
+                raise inquirer.errors.ValidationError(current, reason="End time is before start time")
+        return current
+
+    @memoize_once
+    def get_last_clock_out_time(*args, **kwargs):
+        # Figure out today's timespan
+        time_since = datetime.datetime.combine(
+            datetime.date.today(),
+            datetime.time(0, tzinfo=our_tz())
+        )
+        time_until = datetime.datetime.combine(
+            datetime.date.today() + datetime.timedelta(days=1),
+            datetime.time(0, tzinfo=our_tz())
+        )
+
+        # Get the last clock entry for this period
+        *_, last = api.iter_entries(time_since, time_until)
+
+        if isinstance(last, clockodo.entry.ClockEntry) and last.time_until is not None:
+            return last.time_until.astimezone(our_tz()).strftime("%H:%M:%S")
+
+    questions = [
+        inquirer.List("entry_type", message="Entry type", choices=[("Clock", 1), ("Lump sum", 2)]),
+        inquirer.List("customer", message="Customer",
+                      choices=customer_entries),
+        inquirer.List("project", message="Project", choices=project_entries),
+        inquirer.List("service", message="Service",
+                      choices=service_entries),
+        # XXX why are these two questions so slow? Something is up with them, I wonder what exactly
+        inquirer.Text("time_since", message="Started at [HH:MM:SS]",
+                      default=get_last_clock_out_time(), validate=validate_timestamp,
+                      ignore=lambda ans: ans["entry_type"] != 1),
+        inquirer.Text("time_until", message="Ended at   [HH:MM:SS]",
+                      default=datetime.datetime.now(tz=our_tz()).strftime("%H:%M:%S"),
+                      validate=validate_timestamp,
+                      ignore=lambda ans: ans["entry_type"] != 1),
+        inquirer.Text("time_since", message="Datetime [ISO8601]",
+                      default=datetime.datetime.now(tz=our_tz()).strftime("%Y-%m-%dT%H:%M:%S%z"),
+                      ignore=lambda ans: ans["entry_type"] != 2),
+        inquirer.Text("lumpsum", message="Lump sum (EUR)",
+                      ignore=lambda ans: ans["entry_type"] != 2,
+                      validate=lambda a, c: float(c)),
+        inquirer.List("billable", message="Billable", choices=[
+            ("not billable", 0),
+            ("billable", 1),
+            ("already billed", 2)
+        ]),
+        inquirer.Text("text", message="Description"),
+    ]
+    answers = inquirer.prompt(questions)
+
+    if answers is None:
+        exit(1)
+    elif answers["entry_type"] == 1:
+        # construct clock
+        del answers['lumpsum']
+        del answers['entry_type']
+        answers["time_since"] = datetime.datetime.combine(
+            datetime.date.today(),
+            datetime.time.fromisoformat(answers["time_since"])
+        ).astimezone()
+        answers["time_until"] = datetime.datetime.combine(
+            datetime.date.today(),
+            datetime.time.fromisoformat(answers["time_until"])
+        ).astimezone()
+        # XXX time_since and time_until should be actual times for today
+        entry = clockodo.entry.ClockEntry(api, **answers)
+        print(clock_entry_cb(entry))
+    elif answers["entry_type"] == 2:
+        # construct lump sum
+        answers["time_since"] = datetime.datetime.strptime(answers["time_since"], "%Y-%m-%dT%H:%M:%S%z")
+        del answers['time_until']
+        del answers['entry_type']
+        answers["lumpsum"] = float(answers["lumpsum"])
+        entry = clockodo.entry.LumpSumValue(api, **answers)
+        print(lump_sum_cb(entry))
+
+    if inquirer.confirm("Add new entry?", default=True):
+        api.add_entry(entry)
+
+
+@entries.command(default_command=True, name="list")
 @click.argument('time_since', type=Iso8601, required=False)
 @click.argument('time_until', type=Iso8601, required=False)
 @click.pass_obj
-def entries(api, time_since, time_until):
+def list_entries(api, time_since, time_until):
     if time_since is None:
         time_since = datetime.datetime.combine(
             datetime.date.today(),
