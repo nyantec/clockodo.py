@@ -24,6 +24,7 @@ import functools
 import click
 import inquirer
 import clockodo
+from clockodo.interactivity import our_tz
 
 Iso8601 = click.DateTime([clockodo.entry.ISO8601_TIME_FORMAT])
 
@@ -58,10 +59,6 @@ class DefaultCommandGroup(click.Group):
             args.insert(0, self.default_command)
             return super(
                 DefaultCommandGroup, self).resolve_command(ctx, args)
-
-
-def our_tz():
-    return datetime.datetime.now(tz=datetime.timezone.utc).astimezone().tzinfo
 
 
 def clock_entry_cb(clock):
@@ -165,6 +162,45 @@ def continue_last_clock(api):
         exit(1)
 
     click.echo(clock_entry_cb(last.start()))
+
+
+@clock.command(name="create")
+@click.pass_obj
+def create_clock_interactive(api):
+    from clockodo.interactivity import inject_api, memoize_once, project_entries, customer_entries, service_entries, validate_timestamp, get_last_clock_out_time
+
+    questions = [
+        inquirer.List("customer", message="Customer",
+                      choices=inject_api(customer_entries, api)),
+        inquirer.List("project", message="Project", choices=inject_api(project_entries, api)),
+        inquirer.List("service", message="Service",
+                      choices=inject_api(service_entries, api)),
+        # XXX why are these two questions so slow? Something is up with them, I wonder what exactly
+        inquirer.Text("time_since", message="Started at [HH:MM:SS]",
+                      default=datetime.datetime.now(tz=our_tz()).strftime("%H:%M:%S"),
+                      validate=validate_timestamp),
+        inquirer.List("billable", message="Billable", choices=[
+            ("not billable", 0),
+            ("billable", 1),
+            ("already billed", 2)
+        ]),
+        inquirer.Text("text", message="Description"),
+    ]
+
+    answers = inquirer.prompt(questions)
+    if answers is None:
+        exit(1)
+
+    answers["time_since"] = datetime.datetime.combine(
+        datetime.date.today(),
+        datetime.time.fromisoformat(answers["time_since"])
+    ).astimezone()
+    entry = clockodo.entry.ClockEntry(api, **answers)
+    clock_entry_cb(entry)
+    if inquirer.confirm("Start clock?", default=True):
+        entry = entry.start()
+        print("Clock started, ID:", entry.id)
+
 
 @clock.command(name="new")
 @click.option("--customer", type=str, required=False)
@@ -338,73 +374,18 @@ def entries(ctx):
 @entries.command(name="create")
 @click.pass_obj
 def create_entry_interactive(api):
-    def memoize_once(fun):
-        _cached = None
-        @functools.wraps(fun)
-        def _inner(*args, **kwargs):
-            nonlocal _cached
-            if _cached is None:
-                _cached = fun(*args, **kwargs)
-            return _cached
-
-        return _inner
-
-    @memoize_once
-    def project_entries(answers):
-        return [("(none)", None)] \
-            + [(p.name, p) for p in api.iter_projects(
-                active=True,
-                customer=answers["customer"]
-            )]
-
-    @memoize_once
-    def customer_entries(answers):
-        return [(c.name, c) for c in api.iter_customers(active=True)]
-
-    @memoize_once
-    def service_entries(answers):
-        return [(s.name, s) for s in filter(lambda s: s.active, api.iter_services())]
-
-    def validate_timestamp(answers, current):
-        try:
-            current = datetime.datetime.strptime(current, "%H:%M:%S").time()
-        except ValueError:
-            raise inquirer.errors.ValidationError(current, reason="Time doesn't match format")
-        time_since = answers.get("time_since", None)
-        if time_since is not None:
-            time_since = datetime.datetime.strptime(time_since, "%H:%M:%S").time()
-            if current < time_since:
-                raise inquirer.errors.ValidationError(current, reason="End time is before start time")
-        return current
-
-    @memoize_once
-    def get_last_clock_out_time(*args, **kwargs):
-        # Figure out today's timespan
-        time_since = datetime.datetime.combine(
-            datetime.date.today(),
-            datetime.time(0, tzinfo=our_tz())
-        )
-        time_until = datetime.datetime.combine(
-            datetime.date.today() + datetime.timedelta(days=1),
-            datetime.time(0, tzinfo=our_tz())
-        )
-
-        # Get the last clock entry for this period
-        *_, last = api.iter_entries(time_since, time_until)
-
-        if isinstance(last, clockodo.entry.ClockEntry) and last.time_until is not None:
-            return last.time_until.astimezone(our_tz()).strftime("%H:%M:%S")
+    from clockodo.interactivity import inject_api, memoize_once, project_entries, customer_entries, service_entries, validate_timestamp, get_last_clock_out_time
 
     questions = [
         inquirer.List("entry_type", message="Entry type", choices=[("Clock", 1), ("Lump sum", 2)]),
         inquirer.List("customer", message="Customer",
-                      choices=customer_entries),
-        inquirer.List("project", message="Project", choices=project_entries),
+                      choices=inject_api(customer_entries, api)),
+        inquirer.List("project", message="Project", choices=inject_api(project_entries, api)),
         inquirer.List("service", message="Service",
-                      choices=service_entries),
+                      choices=inject_api(service_entries, api)),
         # XXX why are these two questions so slow? Something is up with them, I wonder what exactly
         inquirer.Text("time_since", message="Started at [HH:MM:SS]",
-                      default=get_last_clock_out_time(), validate=validate_timestamp,
+                      default=get_last_clock_out_time(api), validate=validate_timestamp,
                       ignore=lambda ans: ans["entry_type"] != 1),
         inquirer.Text("time_until", message="Ended at   [HH:MM:SS]",
                       default=datetime.datetime.now(tz=our_tz()).strftime("%H:%M:%S"),
