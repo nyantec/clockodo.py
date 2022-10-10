@@ -137,29 +137,41 @@ def stop_clock(api):
 
 
 @clock.command(name="continue")
+@click.option("--clock-id", type=int, required=False)
 @click.pass_obj
-def continue_last_clock(api):
+def continue_last_clock(api, clock_id):
     current_clock = api.current_clock()
-    if current_clock is not None:
+    if current_clock is not None and clock_id is None:
         click.echo("You're already clocked in!", err=True)
+        click.echo("Note: you can choose a different task to continue using `--clock-id` (look them up in `clockodo entries`)", err=True)
         exit(1)
 
-    # Figure out today's timespan
-    time_since = datetime.datetime.combine(
-        datetime.date.today(),
-        datetime.time(0, tzinfo=our_tz())
-    )
-    time_until = datetime.datetime.combine(
-        datetime.date.today() + datetime.timedelta(days=1),
-        datetime.time(0, tzinfo=our_tz())
-    )
+    if clock_id is None:
+        # Figure out today's timespan
+        time_since = datetime.datetime.combine(
+            datetime.date.today(),
+            datetime.time(0, tzinfo=our_tz())
+        )
+        time_until = datetime.datetime.combine(
+            datetime.date.today() + datetime.timedelta(days=1),
+            datetime.time(0, tzinfo=our_tz())
+        )
 
-    # Get the last clock entry for this period
-    *_, last = api.iter_entries(time_since, time_until)
+        # Get the last clock entry for this period
+        *_, last = filter(
+            lambda i: isinstance(i, clockodo.entry.ClockEntry),
+            api.iter_entries(time_since, time_until)
+        )
 
-    if not isinstance(last, clockodo.entry.ClockEntry):
-        click.echo("Last entry is not a clock entry!", err=True)
-        exit(1)
+        if last is None:
+            click.echo("No entries clocked today. Use `clockodo clock create` to clock in interactively.", err=True)
+            exit(1)
+    else:
+        last = api.get_entry(clock_id)
+
+        if not isinstance(last, clockodo.entry.ClockEntry):
+            click.echo("This entry is not a clock entry!", err=True)
+            exit(1)
 
     click.echo(clock_entry_cb(last.start()))
 
