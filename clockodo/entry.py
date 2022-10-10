@@ -40,7 +40,6 @@ class BaseEntry(metaclass=ABCMeta):
             entry = EntryWithLumpSumService.from_json_blob(api, blob)
         else:
             raise ClockodoError("clocko:do returned entry with unknown type " + str(blob["type"]))
-        entry.time_since = datetime.datetime.strptime(entry.time_since, ISO8601_TIME_FORMAT)
 
         return entry
 
@@ -64,6 +63,7 @@ class ClockEntry(FromJsonBlob, BaseEntry):
     @classmethod
     def from_json_blob(cls, api, blob: dict):
         entry = super(ClockEntry, cls).from_json_blob(api, blob)
+        entry.time_since = datetime.datetime.strptime(entry.time_since, ISO8601_TIME_FORMAT)
         if entry.time_until is not None:
             entry.time_until = datetime.datetime.strptime(entry.time_until, ISO8601_TIME_FORMAT)
 
@@ -129,6 +129,13 @@ class ClockEntry(FromJsonBlob, BaseEntry):
         return self._api.start_clock(self)
 
 class LumpSumValue(FromJsonBlob, BaseEntry):
+    @classmethod
+    def from_json_blob(cls, api, blob: dict):
+        entry = super(LumpSumValue, cls).from_json_blob(api, blob)
+        entry.time_since = datetime.datetime.strptime(entry.time_since, ISO8601_TIME_FORMAT)
+
+        return entry
+
     def __init__(self, api, customer, service,
                  time_since, lumpsum,
                  text=None, user=None,
