@@ -196,7 +196,7 @@ def create_clock_interactive(api):
         datetime.time.fromisoformat(answers["time_since"])
     ).astimezone()
     entry = clockodo.entry.ClockEntry(api, **answers)
-    clock_entry_cb(entry)
+    print(clock_entry_cb(entry))
     if inquirer.confirm("Start clock?", default=True):
         entry = entry.start()
         print("Clock started, ID:", entry.id)
