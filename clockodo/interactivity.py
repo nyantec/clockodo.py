@@ -71,8 +71,12 @@ def get_last_clock_out_time(api=None):
         datetime.time(0, tzinfo=our_tz())
     )
 
-    # Get the last clock entry for this period
-    *_, last = api.iter_entries(time_since, time_until)
+    try:
+        # Get the last clock entry for this period
+        *_, last = api.iter_entries(time_since, time_until)
+    except ValueError:
+        # Fallback in case the iterator is empty
+        last = None
 
     if isinstance(last, clockodo.entry.ClockEntry) and last.time_until is not None:
         return last.time_until.astimezone(our_tz()).strftime("%H:%M:%S")
