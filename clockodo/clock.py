@@ -17,7 +17,7 @@
 # of said person's immediate fault when using the work as intended.
 
 from clockodo.api import FromJsonBlob, ClockodoApi
-from clockodo.entry import ClockEntry
+from clockodo.entry import ClockEntry, iso8601
 
 
 class ClockApi(ClockodoApi):
@@ -40,6 +40,7 @@ class ClockApi(ClockodoApi):
                 "customers_id": clock.customers_id,
                 "projects_id": clock.projects_id,
                 "services_id": clock.services_id,
+                "time_since": iso8601(clock.time_since) if clock.time_since is not None else None,
                 "text": clock.text,
                 "texts_id": clock.texts_id,
                 "billable": str(int(clock.billable)) if clock.billable is not None else None
