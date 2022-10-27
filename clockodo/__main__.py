@@ -210,6 +210,9 @@ def create_clock_interactive(api):
     entry = clockodo.entry.ClockEntry(api, **answers)
     print(clock_entry_cb(entry))
     if inquirer.confirm("Start clock?", default=True):
+        current = api.current_clock()
+        if current is not None:
+            current.stop()
         entry = entry.start()
         print("Clock started, ID:", entry.id)
 
