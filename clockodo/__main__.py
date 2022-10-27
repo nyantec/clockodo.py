@@ -172,6 +172,8 @@ def continue_last_clock(api, clock_id):
         if not isinstance(last, clockodo.entry.ClockEntry):
             click.echo("This entry is not a clock entry!", err=True)
             exit(1)
+        last.time_since = None
+        last.time_until = None
 
     click.echo(clock_entry_cb(last.start()))
 
