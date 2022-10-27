@@ -386,6 +386,73 @@ def entries(ctx):
         ctx.invoke(list_entries)
 
 
+@entries.command(name="edit")
+@click.pass_obj
+@click.option("--entry-id", type=int, required=True)
+@click.option("--customer", type=int, required=False)
+@click.option("--customer-id", type=int, required=False)
+@click.option("--project", type=int, required=False)
+@click.option("--service", type=int, required=False)
+@click.option("--text", type=str, required=False)
+@click.option("--time-since", type=Iso8601, required=False)
+@click.option("--time-until", type=Iso8601, required=False)
+@click.option("--billable", type=bool, required=False)
+def edit_entry(api, entry_id, **kwargs):
+    if kwargs.get("customer_id") is not None:
+        kwargs["customers_id"] = kwargs["customer_id"]
+        del kwargs["customer_id"]
+    elif kwargs.get("customer") is not None:
+        with click.progressbar(api.iter_customers(), label="Determining customer") as bar:
+            for c in bar:
+                if c.name == kwargs["customer"]:
+                    kwargs["customers_id"] = c.id
+                    del kwargs["customer"]
+                    break
+            else:
+                click.echo(f"Can't find a customer named {customer}", err=True)
+                exit(1)
+
+    if kwargs.get("project_id") is not None:
+        kwargs["projects_id"] = kwargs["project_id"]
+        del kwargs["project_id"]
+    elif kwargs.get("project") is not None:
+        with click.progressbar(api.iter_projects(), label="Determining project") as bar:
+            for c in bar:
+                if c.name == kwargs["project"]:
+                    kwargs["projects_id"] = c.id
+                    del kwargs["project"]
+                    break
+            else:
+                click.echo(f"Can't find a project named {project}", err=True)
+                exit(1)
+
+    if kwargs.get("service_id") is not None:
+        kwargs["services_id"] = kwargs["service_id"]
+        del kwargs["service_id"]
+    elif kwargs.get("service") is not None:
+        with click.progressbar(api.iter_services(), label="Determining service") as bar:
+            for c in bar:
+                if c.name == kwargs["service"]:
+                    kwargs["services_id"] = c.id
+                    del kwargs["service"]
+                    break
+            else:
+                click.echo(f"Can't find a service named {service}", err=True)
+                exit(1)
+
+    new_entry = api.edit_entry(
+        api.get_entry(entry_id),
+        kwargs
+    )
+
+    if isinstance(new_entry, clockodo.entry.ClockEntry):
+        click.echo(clock_entry_cb(new_entry))
+    elif isinstance(new_entry, clockodo.entry.LumpSumValue):
+        click.echo(lump_sum_cb(new_entry))
+    else:
+        raise NotImplementedError
+
+
 @entries.command(name="create")
 @click.pass_obj
 def create_entry_interactive(api):

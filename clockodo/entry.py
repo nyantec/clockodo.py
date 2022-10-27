@@ -205,7 +205,7 @@ class EntryApi(ClockodoApi):
             if getattr(entry, "billable", None) is not None:
                 params["billable"] = str(int(entry.billable))
         else:
-            raise NotImpelementedError
+            raise NotImplementedError
 
         response = self._api_call(f"v2/entries", method="POST", params=params)
         return BaseEntry.from_json_blob(self, response["entry"])
