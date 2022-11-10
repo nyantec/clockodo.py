@@ -67,7 +67,10 @@ def clock_entry_cb(clock):
     if clock.project is not None:
         project = f"\nProject: {clock.project}"
     service = str(clock.service)
-    time_since = datetime.datetime.strftime(
+    if clock.time_since is None:
+        time_since = ""
+    else:
+        time_since = "\nStarted at: " + datetime.datetime.strftime(
         clock.time_since.astimezone(our_tz()),
         clockodo.entry.ISO8601_TIME_FORMAT
     )
@@ -79,8 +82,7 @@ def clock_entry_cb(clock):
             clockodo.entry.ISO8601_TIME_FORMAT
         )
     return f"""---
-{clock}
-Started at: {time_since}{time_until}
+{clock}{time_since}{time_until}
 Customer: {customer}{project}
 Service: {service}
 Description: {clock.text}
@@ -189,10 +191,10 @@ def create_clock_interactive(api):
         inquirer.List("project", message="Project", choices=inject_api(project_entries, api)),
         inquirer.List("service", message="Service",
                       choices=inject_api(service_entries, api)),
-        # XXX why are these two questions so slow? Something is up with them, I wonder what exactly
+        inquirer.Confirm("set_time_since", message="Set start time for clock manually?"),
         inquirer.Text("time_since", message="Started at [HH:MM:SS]",
                       default=datetime.datetime.now(tz=our_tz()).strftime("%H:%M:%S"),
-                      validate=validate_timestamp),
+                      validate=validate_timestamp, ignore=lambda ans: not ans["set_time_since"]),
         inquirer.List("billable", message="Billable", choices=[
             ("not billable", 0),
             ("billable", 1),
@@ -204,11 +206,14 @@ def create_clock_interactive(api):
     answers = inquirer.prompt(questions)
     if answers is None:
         exit(1)
-
-    answers["time_since"] = datetime.datetime.combine(
-        datetime.date.today(),
-        datetime.time.fromisoformat(answers["time_since"])
-    ).astimezone()
+    if answers["set_time_since"]:
+        answers["time_since"] = datetime.datetime.combine(
+            datetime.date.today(),
+            datetime.time.fromisoformat(answers["time_since"])
+        ).astimezone()
+    else:
+        del answers["time_since"]
+    del answers["set_time_since"]
     entry = clockodo.entry.ClockEntry(api, **answers)
     print(clock_entry_cb(entry))
     if inquirer.confirm("Start clock?", default=True):

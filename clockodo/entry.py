@@ -105,11 +105,18 @@ class ClockEntry(FromJsonBlob, BaseEntry):
     def clock_duration(self) -> datetime.timedelta:
         if self.time_until is not None:
             return self.time_until - self.time_since
-        else:
+        elif self.time_since is not None:
             return datetime.datetime.now(tz=datetime.timezone.utc) - self.time_since
+        else:
+            return datetime.timedelta(0)
 
     def __str__(self):
-        running=", still running" if self.time_until is None else ""
+        running = ""
+        if self.time_since is not None:
+            if self.time_until is None:
+                running = ", still running"
+        else:
+            running = ", not started"
         duration = format_timedelta(self.clock_duration())
         id=f"(ID {self.id})" if self.id is not None else ""
         if self.billable == 0:
