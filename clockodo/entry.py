@@ -274,11 +274,11 @@ class EntryApi(ClockodoApi):
         }
         for k, v in filters.items():
             if k in ["customer", "project", "service"]:
-                params[f"filters[{k}s_id]"] = v.id
+                params[f"filter[{k}s_id]"] = v.id
             else:
                 if isinstance(v, bool):
                     v = str(int(v))
-                params[f"filters[{k}]"] = v
+                params[f"filter[{k}]"] = v
 
         count_pages = None
         while count_pages is None or params["page"] <= count_pages:
